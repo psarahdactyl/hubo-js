@@ -3,13 +3,14 @@ extends /jade/templates/regular-layout
 block prepend head
   title Sliders | Hubo-js
 block append head
+  link(rel='stylesheet', type='text/css', href='{local_root}lib/jquery-ui/jquery-ui.custom.css')
   link(rel='stylesheet', type='text/css', href='light.css')
 
 block body
   table
     tr
       td
-        #hubo_container(style='position:relative')
+        #hubo_container(style='position:relative; width:480px; height: 480px;')
           #load(style='position:absolute')
         div(style='text-align: center;') LEFT button ROTATES. RIGHT button PANS. MIDDLE wheel ZOOMS.
       td
@@ -23,6 +24,8 @@ block body
               a(href="#neck_waist") Neck / Waist
             li 
               a(href="#fingers") Fingers
+            p Beta: Keep left foot anchored.
+              input#footanchor(type="checkbox")
           #upper_body
             table
               tr
@@ -60,12 +63,12 @@ block body
                     span.joint_txt
               tr
                 td
-                  .joint(data-name='REP')
+                  .joint(data-name='REB')
                     div Right Elbow Pitch: 
                     .joint_slider
                     span.joint_txt
                 td
-                  .joint(data-name='LEP')
+                  .joint(data-name='LEB')
                     div Left Elbow Pitch: 
                     .joint_slider
                     span.joint_txt
@@ -128,12 +131,12 @@ block body
                     span.joint_txt
               tr
                 td
-                  .joint(data-name='RKP')
+                  .joint(data-name='RKN')
                     div Right Knee Pitch: 
                     .joint_slider
                     span.joint_txt
                 td
-                  .joint(data-name='LKP')
+                  .joint(data-name='LKN')
                     div Left Knee Pitch: 
                     .joint_slider
                     span.joint_txt
@@ -181,6 +184,17 @@ block body
                 td
                   .joint(data-name='NK2')
                     div Neck 2: 
+                    .joint_slider
+                    span.joint_txt
+              tr
+                td
+                  .joint(data-name='HNP')
+                    div Neck Pitch: 
+                    .joint_slider
+                    span.joint_txt                    
+                td
+                  .joint(data-name='HNR')
+                    div Neck Roll: 
                     .joint_slider
                     span.joint_txt
           #fingers

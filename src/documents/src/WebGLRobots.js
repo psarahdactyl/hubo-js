@@ -6,8 +6,11 @@
 var WebGLRobots = {version: 0.0};
 
 WebGLRobots.str2vec = function(coords) {
-    coords = coords.split(' ');
     var v = new THREE.Vector3();
+    // This error check is needed to handle objects 
+    // that don't have every property defined.
+    if (typeof coords === "undefined") return v;
+    coords = coords.split(' ');
     v.x = parseFloat(coords[0]);
     v.y = parseFloat(coords[1]);
     v.z = parseFloat(coords[2]);
@@ -19,13 +22,15 @@ WebGLRobots.getDirName = function(filename) {
 }
 
 WebGLRobots.DefaultCanvas = function(container, display_width, display_height) {
-    if (display_width == null) {display_width = 480;};
-    if (display_height == null) {display_height = display_width;};
+    if (display_width == null) {display_width = $(container).width();};
+    if (display_height == null) {display_height = $(container).height();};
 
     // renderer
     var renderer = Detector.webgl? new THREE.WebGLRenderer({antialias: true}): new THREE.CanvasRenderer();
     renderer.setSize(display_width, display_height);
-    $(container).append(renderer.domElement);
+    // NOTE: I use prepend instead of append
+    $(renderer.domElement).css("position","absolute");
+    $(container).prepend(renderer.domElement);
 
     // scene
     var scene = new THREE.Scene();
@@ -64,8 +69,16 @@ WebGLRobots.DefaultCanvas = function(container, display_width, display_height) {
 
     // If the rendering canvas is desired at a size other than the default,
     // this function will resize the canvas and update the trackball control.
-    function defaultResize(display_height, display_width) {
+    function resize(display_width, display_height) {
+        this.display_width = display_width
+        this.display_height = display_height
+        $(renderer.domElement).attr({ 
+            width: display_width,
+            height: display_height
+        });
         renderer.setSize( display_width, display_height );
+        camera.aspect = display_width / display_height;
+        camera.updateProjectionMatrix();
         controls.handleResize();
         render();
     }
@@ -105,6 +118,7 @@ WebGLRobots.DefaultCanvas = function(container, display_width, display_height) {
     this.scene = scene;
     this.camera = camera;
     this.controls = controls;
+    this.resize = resize;
     this.render = render;
     this.add = add;
     return this;
@@ -171,7 +185,6 @@ WebGLRobots.Robot = function() {
                 // TODO: We really need links to be their own class.
                 node.name = name;
                 node.userData.filename = filename;
-                node.userData.color = color;
                 // TODO: Eliminate the need for such ugly checks.
                 if ((typeof node.children !== 'undefined') && (node.children !== null) && 
                     (typeof node.children[0] !== 'undefined') && (node.children[0] !== null) &&
@@ -179,24 +192,29 @@ WebGLRobots.Robot = function() {
                     node.color = node.children[0].material.color;
                     // Set color
                     var arColor = str2floats(color);
-                    console.log(arColor);
                     node.color.setRGB(arColor[0],arColor[1],arColor[2]);
                 } else {
                     node.color = new THREE.Color();
                 }
+                node.userData.original_color = new THREE.Color(node.color);
+                node.userData.prev_color = new THREE.Color(node.color);
                 // Extend link with custom functionality
+                node.setColor = function(color) {
+                    node.userData.prev_color = new THREE.Color(color);
+                    node.color.setHex(color.getHex());
+                    if (_robot.autorender) _robot.canvas.render();
+                }
                 node.highlight = function() {
+                    node.userData.prev_color = new THREE.Color(node.color);
                     node.color.setRGB(1,1,0);
+                    if (_robot.autorender) _robot.canvas.render();
                 };
                 node.unhighlight = function() {
-                    var color = node.userData.color;
                     if ((typeof node.children !== 'undefined') && (node.children !== null) && 
-                        (typeof node.children[0] !== 'undefined') && (node.children[0] !== null) &&
-                        (typeof color !== 'undefined') && (color !== null)) {
-                        var arColor = str2floats(color);
-                        console.log(arColor);
-                        node.color.setRGB(arColor[0],arColor[1],arColor[2]);
+                        (typeof node.children[0] !== 'undefined') && (node.children[0] !== null)) {
+                        node.color.setHex(node.userData.prev_color.getHex());
                     }
+                    if (_robot.autorender) _robot.canvas.render();
                 };
                 _robot.links[name] = node;
                 // Report progress
@@ -273,20 +291,50 @@ WebGLRobots.Robot = function() {
                     createLink(name, new THREE.Object3D());
                 } else {
                     filename = path + filename;
-                    // Load mesh
-                    var loader = new THREE.ColladaLoader();
-                    loader.load(filename, 
-                        function(collada) {
-                            var node = collada.scene;
-                            createLink(name, node, filename, color);
-                        }, 
-                        onProgress);
+                    // Determine file type
+                    var ext = filename.match(/\.[^\.]+$/)[0];
+                    // TODO: Add useful messages if the loaders error
+                    if (ext === ".dae") {
+                        console.log('filename: ' + filename);
+                        console.log('Collada support has been deprecated. Use STL.');
+                        // Load mesh
+                        var loader = new THREE.ColladaLoader();
+                        loader.load(filename, 
+                            function(collada) {
+                                var node = collada.scene;
+                                createLink(name, node, filename, color);
+                            }, 
+                            onProgress);
+                    } else if (ext === ".stl") {
+                        // Load mesh
+                        var loader = new THREE.STLLoader();
+                        loader.addEventListener('load', function (event) {
+                            var geometry = event.content;
+                            var mat = new THREE.MeshLambertMaterial({color: 0xCCCCCC});
+                            var mesh = new THREE.Mesh(geometry,mat);
+                            var node = new THREE.Object3D();
+                            node.add(mesh);
+                            createLink(name,node,filename,color);
+                        });
+                        loader.addEventListener('progress', onProgress);
+                        loader.load(filename);
+                    }
                 }
             });
         })
-        .fail(function() { alert("error"); })
+        .fail(function() { alert("Error loading URDF."); })
     };
     
+    this.unhighlightAll = function() {
+        var save = _robot.autorender;
+        _robot.autorender = false;
+        _robot.links.asArray().forEach(function(link) {
+            link.unhighlight();
+        })
+        _robot.autorender = save;
+        if (_robot.autorender) _robot.canvas.render();
+    }
+
     // TODO: Figure out how to show progress more effectively.
     function onProgress(data) {
         // data.total might be null if the server does not set the Content-Length header
