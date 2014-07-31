@@ -26,6 +26,8 @@ If you are at this page, I assume you are looking for the demos. All the demos a
 >
 > [sliders.html]({local_root}examples/sliders/sliders.html): Position upper body joints with slider controls.
 >
+> [python.html]({local_root}examples/python/python.html): Position joints and generate a Python script.
+>
 > [minimal.html]({local_root}examples/minimal/minimal.html): Minimalistic demo with single joint movement.
 >
 > [really_minimal.html]({local_root}examples/minimal/really_minimal.html): Embed hubo in an `<iframe>`.
